@@ -1,0 +1,11 @@
+.git
+.gitignore
+.idea
+target
+*.iml
+*.md
+node_modules
+**/node_modules
+*.log
+db
+README.md

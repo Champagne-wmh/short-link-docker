@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>短链生成器</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; margin-top: 50px; }
+        .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 400px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        button:hover { background: #218838; }
+        .result { margin-top: 20px; font-weight: bold; color: #333; word-break: break-all; padding: 10px; background: #e9ecef; border-radius: 4px; }
+        .result a { color: #007bff; text-decoration: none; }
+        .result a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<div id="app" class="container">
+    <h2>🔗 生成你的短链接</h2>
+
+    <div class="form-group">
+        <label>原始长链接 (必填)</label>
+        <input type="text" v-model="originUrl" placeholder="例如: https://www.baidu.com">
+    </div>
+
+    <div class="form-group">
+        <label>自定义短码 (可选)</label>
+        <input type="text" v-model="customCode" placeholder="例如: wuhan2027 (留空自动生成)">
+    </div>
+
+    <button @click="createShortLink">生成短链</button>
+
+    <div class="result" v-if="shortUrl">
+        🎉 生成成功：<br>
+        <a :href="shortUrl" target="_blank">{{ shortUrl }}</a>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref } = Vue;
+    createApp({
+        setup() {
+            // 定义响应式变量
+            const originUrl = ref('');
+            const customCode = ref('');
+            const shortUrl = ref('');
+
+            const createShortLink = async () => {
+                if (!originUrl.value) {
+                    alert('请输入原始长链接');
+                    return;
+                }
+                // 简单的前端校验，必须是 http 或 https 开头
+                if (!originUrl.value.startsWith('http://') && !originUrl.value.startsWith('https://')) {
+                    alert('链接必须以 http:// 或 https:// 开头');
+                    return;
+                }
+
+                try {
+                    // 发起 POST 请求，参数与后端的 CreateShortLinkReq 字段对齐
+                    const res = await axios.post('/api/short-link', {
+                        originUrl: originUrl.value,
+                        customCode: customCode.value
+                    });
+
+                    if (res.data.code === 0) {
+                        // 注意：这里我们需要看你的 ShortLinkResp 里返回的具体字段名
+                        // 假设返回的是完整短链：res.data.data.shortUrl
+                        // 假设返回的是短码：res.data.data.shortCode
+                        // 这里我做个兼容处理：
+                        const data = res.data.data;
+                        const code = data.shortCode || data.code;
+
+                        if (data.shortUrl) {
+                            shortUrl.value = data.shortUrl;
+                        } else if (code) {
+                            shortUrl.value = "http://localhost:8080/jump/" + code;
+                        } else {
+                            alert("后端没有返回短链字段，请检查 ShortLinkResp！");
+                        }
+                    } else {
+                        alert("生成失败: " + res.data.message);
+                    }
+                } catch (error) {
+                    console.error(error);
+                    if (error.response && error.response.data) {
+                        alert("校验失败: " + error.response.data.message);
+                    } else {
+                        alert('请求失败，请检查后端控制台');
+                    }
+                }
+            };
+
+            return { originUrl, customCode, shortUrl, createShortLink };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
