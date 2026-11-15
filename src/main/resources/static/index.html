@@ -2,102 +2,221 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>短链生成器</title>
+    <title>短链接管理系统</title>
+    <!-- 引入 Vue3 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- 引入 Element Plus UI 框架 -->
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+    <script src="https://unpkg.com/element-plus"></script>
+    <!-- 引入 Element Plus 图标 -->
+    <script src="https://unpkg.com/@element-plus/icons-vue"></script>
+    <!-- 引入 Axios -->
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; margin-top: 50px; }
-        .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 400px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
-        input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; }
-        button:hover { background: #218838; }
-        .result { margin-top: 20px; font-weight: bold; color: #333; word-break: break-all; padding: 10px; background: #e9ecef; border-radius: 4px; }
-        .result a { color: #007bff; text-decoration: none; }
-        .result a:hover { text-decoration: underline; }
+        body { background-color: #f0f2f5; margin: 0; padding: 20px; font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; color: #333; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1); margin-bottom: 20px; }
+        .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
+        .form-row > div { flex: 1; }
+        .table-actions { display: flex; gap: 10px; }
     </style>
 </head>
 <body>
 <div id="app" class="container">
-    <h2>🔗 生成你的短链接</h2>
-
-    <div class="form-group">
-        <label>原始长链接 (必填)</label>
-        <input type="text" v-model="originUrl" placeholder="例如: https://www.baidu.com">
+    <div class="header">
+        <h1>🔗 短链接管理系统</h1>
+        <p>高性能生成、管理与跳转（支持容器化部署）</p>
     </div>
 
-    <div class="form-group">
-        <label>自定义短码 (可选)</label>
-        <input type="text" v-model="customCode" placeholder="例如: wuhan2027 (留空自动生成)">
+    <!-- 生成短链卡片 -->
+    <div class="card">
+        <el-form :model="form" label-width="100px" label-position="top">
+            <div class="form-row">
+                <el-form-item label="原始长链接 (必填)">
+                    <el-input v-model="form.originUrl" placeholder="https://www.example.com/very/long/url"></el-input>
+                </el-form-item>
+                <el-form-item label="自定义短码 (可选)">
+                    <el-input v-model="form.customCode" placeholder="4-16位字母数字，留空自动生成"></el-input>
+                </el-form-item>
+            </div>
+            <div class="form-row">
+                <el-form-item label="有效期类型">
+                    <el-radio-group v-model="form.validDateType">
+                        <el-radio :label="0">永久有效</el-radio>
+                        <el-radio :label="1">自定义到期</el-radio>
+                    </el-radio-group>
+                </el-form-item>
+                <el-form-item label="过期时间" v-if="form.validDateType === 1">
+                    <el-date-picker
+                            v-model="form.validDate"
+                            type="datetime"
+                            placeholder="选择过期时间"
+                            value-format="YYYY-MM-DD HH:mm:ss"
+                            style="width: 100%;">
+                    </el-date-picker>
+                </el-form-item>
+            </div>
+            <el-button type="primary" @click="createShortLink" :loading="loading" style="width: 100%; height: 40px; font-size: 16px;">
+                生成短链
+            </el-button>
+        </el-form>
     </div>
 
-    <button @click="createShortLink">生成短链</button>
+    <!-- 刚生成的短链展示 -->
+    <div class="card" v-if="latestResult" style="background: #e8f5e9; border-left: 5px solid #4caf50;">
+        <h3 style="margin-top: 0; color: #2e7d32;">🎉 生成成功</h3>
+        <p><strong>原始链接：</strong>{{ latestResult.originUrl }}</p>
+        <p style="display: flex; align-items: center; gap: 15px;">
+            <strong>短链地址：</strong>
+            <a :href="latestResult.shortUrl" target="_blank" style="font-size: 18px; color: #1976d2;">{{ latestResult.shortUrl }}</a>
+            <el-button size="small" type="success" plain @click="copyToClipboard(latestResult.shortUrl)">复制</el-button>
+        </p>
+    </div>
 
-    <div class="result" v-if="shortUrl">
-        🎉 生成成功：<br>
-        <a :href="shortUrl" target="_blank">{{ shortUrl }}</a>
+    <!-- 短链管理列表 -->
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3>📋 短链列表 (分组: default)</h3>
+            <el-button @click="fetchList" icon="Refresh">刷新列表</el-button>
+        </div>
+        <el-table :data="tableData" style="width: 100%" v-loading="tableLoading" stripe>
+            <el-table-column prop="shortCode" label="短码" width="120">
+                <template #default="scope">
+                    <el-tag>{{ scope.row.shortCode }}</el-tag>
+                </template>
+            </el-table-column>
+            <el-table-column prop="originUrl" label="原始链接" show-overflow-tooltip></el-table-column>
+            <el-table-column prop="createTime" label="创建时间" width="180"></el-table-column>
+            <el-table-column label="状态" width="100">
+                <template #default="scope">
+                    <el-tag :type="scope.row.enableStatus === 0 ? 'success' : 'danger'">
+                        {{ scope.row.enableStatus === 0 ? '启用' : '禁用' }}
+                    </el-tag>
+                </template>
+            </el-table-column>
+            <el-table-column label="操作" width="220">
+                <template #default="scope">
+                    <div class="table-actions">
+                        <el-button size="small" type="primary" plain @click="updateStatus(scope.row.shortCode, scope.row.enableStatus)">
+                            {{ scope.row.enableStatus === 0 ? '禁用' : '启用' }}
+                        </el-button>
+                        <el-popconfirm title="确定要删除这个短链吗？" @confirm="deleteLink(scope.row.shortCode)">
+                            <template #reference>
+                                <el-button size="small" type="danger" plain>删除</el-button>
+                            </template>
+                        </el-popconfirm>
+                    </div>
+                </template>
+            </el-table-column>
+        </el-table>
     </div>
 </div>
 
 <script>
-    const { createApp, ref } = Vue;
+    const { createApp, ref, onMounted } = Vue;
+    const { ElMessage } = ElementPlus;
+
     createApp({
         setup() {
-            // 定义响应式变量
-            const originUrl = ref('');
-            const customCode = ref('');
-            const shortUrl = ref('');
+            // 表单数据
+            const form = ref({
+                originUrl: '',
+                customCode: '',
+                validDateType: 0,
+                validDate: null
+            });
+            const loading = ref(false);
+            const latestResult = ref(null);
 
+            // 列表数据
+            const tableData = ref([]);
+            const tableLoading = ref(false);
+
+            // 生成短链
             const createShortLink = async () => {
-                if (!originUrl.value) {
-                    alert('请输入原始长链接');
-                    return;
+                if (!form.value.originUrl) {
+                    return ElMessage.warning('请输入原始长链接');
                 }
-                // 简单的前端校验，必须是 http 或 https 开头
-                if (!originUrl.value.startsWith('http://') && !originUrl.value.startsWith('https://')) {
-                    alert('链接必须以 http:// 或 https:// 开头');
-                    return;
+                if (!form.value.originUrl.startsWith('http://') && !form.value.originUrl.startsWith('https://')) {
+                    return ElMessage.warning('链接必须以 http:// 或 https:// 开头');
                 }
 
+                loading.value = true;
                 try {
-                    // 发起 POST 请求，参数与后端的 CreateShortLinkReq 字段对齐
-                    const res = await axios.post('/api/short-link', {
-                        originUrl: originUrl.value,
-                        customCode: customCode.value
-                    });
-
+                    const res = await axios.post('/api/short-link', form.value);
                     if (res.data.code === 0) {
-                        // 注意：这里我们需要看你的 ShortLinkResp 里返回的具体字段名
-                        // 假设返回的是完整短链：res.data.data.shortUrl
-                        // 假设返回的是短码：res.data.data.shortCode
-                        // 这里我做个兼容处理：
-                        const data = res.data.data;
-                        const code = data.shortCode || data.code;
-
-                        if (data.shortUrl) {
-                            shortUrl.value = data.shortUrl;
-                        } else if (code) {
-                            shortUrl.value = "http://localhost:8080/jump/" + code;
-                        } else {
-                            alert("后端没有返回短链字段，请检查 ShortLinkResp！");
-                        }
+                        ElMessage.success('生成成功');
+                        latestResult.value = res.data.data;
+                        form.value = { originUrl: '', customCode: '', validDateType: 0, validDate: null }; // 重置表单
+                        fetchList(); // 刷新列表
                     } else {
-                        alert("生成失败: " + res.data.message);
+                        ElMessage.error(res.data.message || '生成失败');
                     }
                 } catch (error) {
-                    console.error(error);
-                    if (error.response && error.response.data) {
-                        alert("校验失败: " + error.response.data.message);
-                    } else {
-                        alert('请求失败，请检查后端控制台');
-                    }
+                    ElMessage.error(error.response?.data?.message || '请求失败，请检查后端');
+                } finally {
+                    loading.value = false;
                 }
             };
 
-            return { originUrl, customCode, shortUrl, createShortLink };
+            // 获取列表
+            const fetchList = async () => {
+                tableLoading.value = true;
+                try {
+                    const res = await axios.get('/api/short-link/list?gid=default');
+                    if (res.data.code === 0) {
+                        tableData.value = res.data.data;
+                    }
+                } catch (e) {
+                    ElMessage.error('获取列表失败');
+                } finally {
+                    tableLoading.value = false;
+                }
+            };
+
+            // 启用/禁用
+            const updateStatus = async (shortCode, currentStatus) => {
+                const newStatus = currentStatus === 0 ? 1 : 0;
+                try {
+                    await axios.put(`/api/short-link/${shortCode}/status?enableStatus=${newStatus}`);
+                    ElMessage.success('状态更新成功');
+                    fetchList();
+                } catch (e) {
+                    ElMessage.error('状态更新失败');
+                }
+            };
+
+            // 删除
+            const deleteLink = async (shortCode) => {
+                try {
+                    await axios.delete(`/api/short-link/${shortCode}`);
+                    ElMessage.success('删除成功');
+                    fetchList();
+                } catch (e) {
+                    ElMessage.error('删除失败');
+                }
+            };
+
+            // 复制到剪贴板
+            const copyToClipboard = (text) => {
+                navigator.clipboard.writeText(text).then(() => {
+                    ElMessage.success('短链已复制到剪贴板');
+                });
+            };
+
+            // 页面加载时拉取列表
+            onMounted(() => {
+                fetchList();
+            });
+
+            return {
+                form, loading, latestResult, tableData, tableLoading,
+                createShortLink, fetchList, updateStatus, deleteLink, copyToClipboard
+            };
         }
-    }).mount('#app');
+    }).use(ElementPlus).mount('#app');
 </script>
 </body>
 </html>

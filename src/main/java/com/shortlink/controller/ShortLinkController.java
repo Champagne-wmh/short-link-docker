@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -34,6 +35,8 @@ public class ShortLinkController {
     private ShortLinkService shortLinkService;
     @Resource
     private Producer producer;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     /**
      * 创建短链。
@@ -135,5 +138,15 @@ public class ShortLinkController {
     public Result<Void> delete(@PathVariable String shortCode) {
         shortLinkService.delete(shortCode);
         return Result.success();
+    }
+
+    /**
+     * 测试Redis。
+     */
+    @GetMapping("/api/short-link/test-redis")
+    public Result<String> testRedis() {
+        stringRedisTemplate.opsForValue().set("test:key", "Hello Redis from Docker!");
+        String val = stringRedisTemplate.opsForValue().get("test:key");
+        return Result.success("Redis 连通性测试成功，读取值: " + val);
     }
 }
