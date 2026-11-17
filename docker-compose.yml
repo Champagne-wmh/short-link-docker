@@ -1,0 +1,78 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: short-link-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: "wrong_password"
+      MYSQL_DATABASE: short_link
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次启动时自动执行建表脚本
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p123456"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: short-link-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    # 开启 AOF 持久化
+    command: redis-server --appendonly yes
+
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: short-link-rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: app
+      RABBITMQ_DEFAULT_PASS: "123456"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    image: short-link:2.0.0
+    container_name: short-link-app
+    restart: always
+    ports:
+      - "8081:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy   # 等 MySQL 彻底就绪
+      rabbitmq:
+        condition: service_healthy  # 等 MQ 彻底就绪
+      redis:
+        condition: service_started  # Redis 启动快，启动完即可
+    environment:
+      # 注意：这里全部换成了 Docker 内部的服务名（mysql, rabbitmq, redis）
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/short_link?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: "123456"
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: app
+      SPRING_RABBITMQ_PASSWORD: "123456"
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:
