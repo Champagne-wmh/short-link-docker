@@ -3,13 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>短链接管理系统</title>
-    <!-- 引入 Vue3 (国内镜像) -->
-    <script src="https://registry.npmmirror.com/vue/3.4.21/files/dist/vue.global.prod.js"></script>
-    <!-- 引入 Element Plus UI 框架 (国内镜像) -->
-    <link rel="stylesheet" href="https://registry.npmmirror.com/element-plus/2.6.3/files/dist/index.css" />
-    <script src="https://registry.npmmirror.com/element-plus/2.6.3/files/dist/index.full.js"></script>
-    <!-- 引入 Axios (国内镜像) -->
-    <script src="https://registry.npmmirror.com/axios/1.6.8/files/dist/axios.min.js"></script>
+    <!-- 使用国内极度稳定的 Staticfile CDN -->
+    <script src="https://cdn.staticfile.net/vue/3.4.21/vue.global.prod.js"></script>
+    <link rel="stylesheet" href="https://cdn.staticfile.net/element-plus/2.6.3/index.css" />
+    <script src="https://cdn.staticfile.net/element-plus/2.6.3/index.full.min.js"></script>
+    <script src="https://cdn.staticfile.net/axios/1.6.8/axios.min.js"></script>
     <style>
         body { background-color: #f0f2f5; margin: 0; padding: 20px; font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif; }
         .container { max-width: 1000px; margin: 0 auto; }
@@ -198,6 +196,10 @@
 
             // 复制到剪贴板
             const copyToClipboard = (text) => {
+                if (text && text.includes("{{")) {
+                    ElMessage.error('页面尚未加载完成，请按 Ctrl + F5 强制刷新！');
+                    return;
+                }
                 navigator.clipboard.writeText(text).then(() => {
                     ElMessage.success('短链已复制到剪贴板');
                 });
