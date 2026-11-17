@@ -149,4 +149,11 @@ public class ShortLinkController {
         String val = stringRedisTemplate.opsForValue().get("test:key");
         return Result.success("Redis 连通性测试成功，读取值: " + val);
     }
+    /**
+     * Health。
+     */
+    @GetMapping("/health")
+    public Result<String> health() {
+        return Result.success("UP");
+    }
 }
