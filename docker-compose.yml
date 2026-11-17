@@ -4,7 +4,7 @@ services:
     container_name: short-link-mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: "wrong_password"
+      MYSQL_ROOT_PASSWORD: "123456"
       MYSQL_DATABASE: short_link
     ports:
       - "3306:3306"
