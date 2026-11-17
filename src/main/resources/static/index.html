@@ -195,15 +195,45 @@
             };
 
             // 复制到剪贴板
+            // 复制到剪贴板（全兼容版本）
             const copyToClipboard = (text) => {
-                if (text && text.includes("{{")) {
-                    ElMessage.error('页面尚未加载完成，请按 Ctrl + F5 强制刷新！');
+                if (!text || text.includes("{{")) {
+                    ElMessage.error('页面尚未加载完成，请刷新后重试');
                     return;
                 }
-                navigator.clipboard.writeText(text).then(() => {
-                    ElMessage.success('短链已复制到剪贴板');
-                });
+                // 优先尝试现代剪贴板API
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        ElMessage.success('短链已复制到剪贴板');
+                    }).catch(() => {
+                        fallbackCopy(text);
+                    });
+                } else {
+                    // 旧环境走兜底方案
+                    fallbackCopy(text);
+                }
             };
+
+// 兼容所有浏览器的兜底复制逻辑
+            const fallbackCopy = (text) => {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                // 脱离可视区域，避免闪烁
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                textarea.style.top = '-1000px';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    const success = document.execCommand('copy');
+                    success ? ElMessage.success('短链已复制到剪贴板') : ElMessage.error('复制失败，请手动选中复制');
+                } catch (err) {
+                    ElMessage.error('复制失败，请手动选中复制');
+                } finally {
+                    document.body.removeChild(textarea);
+                }
+            };
+
 
             // 页面加载时拉取列表
             onMounted(() => {
